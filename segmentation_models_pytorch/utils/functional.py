@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 
 def _take_channels(*xs, ignore_channels=None):
@@ -123,4 +124,61 @@ def recall(pr, gt, eps=1e-7, threshold=None, ignore_channels=None):
 
     score = (tp + eps) / (tp + fn + eps)
 
+    return score
+
+def CE(pr, gt, eps=1e-6, threshold=0.5, ignore_channels=None, class_intervals=None):  # <mboaz17>
+    """Calculate Cross Entropy score between ground truth and prediction
+    Args:
+        pr (torch.Tensor): predicted tensor
+        gt (torch.Tensor):  ground truth tensor
+        eps (float): epsilon to avoid zero division
+        threshold: threshold for outputs binarization
+        class_intervals: if None, all class_weights are 1
+    Returns:
+        float: precision score
+    """
+
+    if class_intervals is None:
+        class_intervals = np.ones((gt.shape[1]), dtype=np.int32)
+
+    pr = _threshold(pr, threshold=threshold)
+    pr, gt = _take_channels(pr, gt, ignore_channels=ignore_channels)
+
+    # Balanced classes
+    if 1:
+        score = torch.tensor(0, device='cuda', dtype=pr.dtype)
+        samples_num = torch.tensor(0, device='cuda')
+        for c in range(gt.shape[1]):
+            class_indices = (gt[0, c] > 0.5).nonzero()
+            sampled_indices = torch.linspace(0, len(class_indices)-1, np.int32(len(class_indices) / class_intervals[c])).long()
+            pr_sampled = pr[0, c, class_indices[sampled_indices,0], class_indices[sampled_indices,1]]
+            score += torch.sum( - torch.log(pr_sampled + eps), dtype=pr.dtype)
+            samples_num += len(sampled_indices)
+
+        score /= samples_num
+
+    # Unbalanced classes
+    else:
+        score = torch.sum( - gt * torch.log(pr+eps), dtype=pr.dtype) / (torch.sum(gt) + eps)
+
+    return score
+
+
+
+def BCE(pr, gt, eps=1e-6, threshold=0.5, ignore_channels=None):  # <mboaz17>
+    """Calculate Binary Cross Entropy score between ground truth and prediction
+    Args:
+        pr (torch.Tensor): predicted tensor
+        gt (torch.Tensor):  ground truth tensor
+        eps (float): epsilon to avoid zero division
+        threshold: threshold for outputs binarization
+    Returns:
+        float: precision score
+    """
+    pr = _threshold(pr, threshold=threshold)
+    pr, gt = _take_channels(pr, gt, ignore_channels=ignore_channels)
+
+    mask_pos = gt.sum(dim=1) > 0.5
+
+    score = torch.sum(mask_pos * ( (- gt * torch.log(pr+eps)) - ((1-gt) * torch.log((1-pr)+eps)) )) / (torch.sum(mask_pos) + eps)
     return score
