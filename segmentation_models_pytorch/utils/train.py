@@ -33,7 +33,7 @@ class Epoch:
     def on_epoch_start(self):
         pass
 
-    def run(self, dataloader):
+    def run(self, dataloader, conf_obj=None):
 
         self.on_epoch_start()
 
@@ -44,7 +44,10 @@ class Epoch:
         with tqdm(dataloader, desc=self.stage_name, file=sys.stdout, disable=not (self.verbose)) as iterator:
             for x, y in iterator:
                 x, y = x.to(self.device), y.to(self.device)
-                loss, y_pred = self.batch_update(x, y)
+                if conf_obj:
+                    loss, y_pred = self.batch_update(x, y, conf_obj=conf_obj)
+                else:
+                    loss, y_pred = self.batch_update(x, y)
 
                 # update loss logs
                 loss_value = loss.cpu().detach().numpy()
@@ -62,6 +65,9 @@ class Epoch:
                 if self.verbose:
                     s = self._format_logs(logs)
                     iterator.set_postfix_str(s)
+
+        if conf_obj:
+            conf_obj.normalize_hist_after_batch(iterator.total)
 
         return logs
 
@@ -106,8 +112,8 @@ class ValidEpoch(Epoch):
     def on_epoch_start(self):
         self.model.eval()
 
-    def batch_update(self, x, y):
+    def batch_update(self, x, y, conf_obj=None):
         with torch.no_grad():
-            prediction = self.model.forward(x)
+            prediction = self.model.forward(x, y=y, conf_obj=conf_obj, mode='update')
             loss = self.loss(prediction, y)
         return loss, prediction

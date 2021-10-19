@@ -1,10 +1,12 @@
 import os
+import pickle
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+from examples.mboaz17.conf_utils.conf_est import ConfEst
 
 # %%
 
@@ -91,6 +93,7 @@ model = smp.FPN(
     classes=len(CLASSES),
     activation=ACTIVATION,
 )
+model = torch.load('./best_model.pth')
 
 preprocessing_fn = smp.encoders.get_preprocessing_fn(ENCODER, ENCODER_WEIGHTS)
 
@@ -129,7 +132,7 @@ metrics = [
 ]
 
 optimizer = torch.optim.Adam([
-    dict(params=model.parameters(), lr=0.0001),
+    dict(params=model.parameters(), lr=0.0),  # lr=0 -> don't change the net
 ])
 
 # %%
@@ -153,27 +156,23 @@ valid_epoch = smp.utils.train.ValidEpoch(
     verbose=True,
 )
 
-# %%
+## Define a confidence object
+conf_obj = ConfEst()
 
-# train model for 40 epochs
+# run model for 1 epoch
 
 max_score = 0
 iter_num = 0
 for i in range(0, iter_num):
+    # train_logs = train_epoch.run(train_loader)
+    valid_logs = valid_epoch.run(valid_loader, conf_obj=conf_obj)
+    with open('./conf_model.pkl', 'wb') as output:
+        pickle.dump(conf_obj, output, pickle.HIGHEST_PROTOCOL)
+        print('confidence model saved')
 
-    print('\nEpoch: {}'.format(i))
-    train_logs = train_epoch.run(train_loader)
-    valid_logs = valid_epoch.run(valid_loader)
-
-    # do something (save model, change lr, etc.)
-    if max_score < valid_logs['iou_score']:
-        max_score = valid_logs['iou_score']
-        torch.save(model, './best_model.pth')
-        print('Model saved!')
-
-    if i == 25:
-        optimizer.param_groups[0]['lr'] = 1e-5
-        print('Decrease decoder learning rate to 1e-5!')
+if iter_num == 0:  # then load conf_obj
+    with open('./conf_model.pkl', 'rb') as input:
+        conf_obj = pickle.load(input)
 
 ## Test best saved model
 
@@ -224,8 +223,10 @@ for i in range(20):
     gt_mask = gt_mask.argmax(axis=0)
 
     x_tensor = torch.from_numpy(image).to(DEVICE).unsqueeze(0)
-    pr_mask = best_model.predict(x_tensor)
+    pr_mask, score_map = best_model.predict(x_tensor, conf_obj=conf_obj, mode='compare')
+    pr_score = (pr_mask.squeeze().cpu().numpy()).max(axis=0)
     pr_mask = (pr_mask.squeeze().cpu().numpy().round())
+    score_map = (score_map.squeeze().cpu().numpy())
     pr_mask = pr_mask.argmax(axis=0)
     pr_mask_vis = 0*image_vis
     gt_mask_vis = 0*image_vis
@@ -238,9 +239,7 @@ for i in range(20):
     visualize(
         image=image_vis,
         ground_truth_mask=gt_mask_vis,
-        predicted_mask=pr_mask_vis
+        predicted_mask=pr_mask_vis,
+        softmax_score=pr_score<0.99,
+        score_map=score_map<0.99,
     )
-
-# TODO:
-# 1) Support class_intervals for batch size > 1
-# 2) Support class_intervals for DiceLoss?

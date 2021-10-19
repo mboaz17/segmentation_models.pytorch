@@ -32,7 +32,8 @@ class Dataset(BaseDataset):
 
     # samples_num_all = [1822091, 4697038, 5583920]
     # class_intervals = samples_num_all / np.min(samples_num_all)
-    class_intervals = [1, 1, 1, 50, 50, 50, 1, 50]
+    # class_intervals = [1, 1, 1, 50, 50, 50, 1, 50]
+    class_intervals = [1, 1, 1, 50, 50, 100000, 1, 50]  # ignoring vegetation
     def __init__(
             self,
             images_dir,
