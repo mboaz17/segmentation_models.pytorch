@@ -398,5 +398,5 @@ for i in range(20):
 # * Determine number of bins per feature level
 # * Weigh each image using the number of contributing pixels (not equally)
 # * Determine best histogram matching criterion
-
-# * Calculate true prob density after dim reduction
+# * Take features before the nonlinearity (but it's more technically complicated)
+# * Calculate true prob density after dim reduction - perhaps using PCA

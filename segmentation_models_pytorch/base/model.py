@@ -1,6 +1,7 @@
 import torch
 from . import initialization as init
 from examples.mboaz17.conf_utils.hist import calc_hist
+from examples.mboaz17.conf_utils.histogramdd import histogramdd
 import torch.nn.functional as F
 
 class SegmentationModel(torch.nn.Module):
@@ -19,7 +20,15 @@ class SegmentationModel(torch.nn.Module):
             hist_list = []
             for ind in range(conf_obj.stage_end):
                 if conf_obj.stages_valid[ind]:
-                    win_size_half = conf_obj.win_half_size_list[ind]
+                    b, ch, r, c = features[ind].shape
+                    dims_num = 4
+                    features_reshaped = features[ind].view((b, dims_num, int(ch/dims_num), r, c))
+                    features_projected = torch.mean(features_reshaped, dim=2)
+                    features_projected_flattened = features_projected.view((dims_num, -1))
+
+                    edges = torch.tensor((0, 1e-6, 1e-2, 1e-1, 1e0, 1e1, 1e10), device=features_projected.device)
+                    tmp = histogramdd(features_projected_flattened, edges=edges)
+
                     hist_tensor = calc_hist(features[ind], win_size_half=win_size_half, edges=[0, 1e-6, 1e-2, 1e-1, 1e0, 1e1, 1e10])
                     hist_list.append((hist_tensor))
                     if mode == 'update':

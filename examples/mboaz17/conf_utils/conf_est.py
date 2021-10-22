@@ -4,15 +4,16 @@ import torch.nn.functional as F
 class ConfEst:
 
     def __init__(self):
-        self.criterion = 'inner_product'
-        self.stages_valid = [0, 1e-5, 1e-5, 1e-5, 1e-5, 1]
+        self.dims_num = 2
+        self.stages_valid = [0, 1, 1, 1, 1, 1]
         self.stage_end = len(self.stages_valid)
         self.hist_list = []
-        self.win_half_size_list = []
         for ind in range(self.stage_end):
-            win_size_half = (2 ** (self.stage_end - 1 - ind) - 1, 2 ** (self.stage_end - 1 - ind) - 1)
-            self.win_half_size_list.append(win_size_half)
             self.hist_list.append(0)
+
+        self.edges_list = []
+        for d in range(self.dims_num):
+            self.edges_list.append([0, 1e-6, 1e-2, 1e-1, 1e0, 1e1, 1e10])
 
     def compare_hist_to_model(self, hist_list=[], image_size=(0, 0)):
         assert len(self.hist_list) == len(hist_list)
@@ -36,4 +37,10 @@ class ConfEst:
     def normalize_hist_after_batch(self, iterations_num=1):
         for ind in range(self.stage_end):
             self.hist_list[ind] /= iterations_num
+
+
+    def calc_hist(self, x):
+
+        assert x.shape[1] == self.dims_num
+
 
