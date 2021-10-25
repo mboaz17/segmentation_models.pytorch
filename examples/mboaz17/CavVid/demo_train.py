@@ -7,7 +7,7 @@ import cv2
 import matplotlib.pyplot as plt
 
 # %%
-
+np.random.seed(0)
 DATA_DIR = '../../data/CamVid/'
 
 # load repo with data if it is not exists
@@ -225,15 +225,14 @@ import segmentation_models_pytorch as smp
 
 ENCODER = 'se_resnext50_32x4d'
 ENCODER_WEIGHTS = 'imagenet'
-# CLASSES = ['car']
-CLASSES = ['sky', 'building', 'pole', 'road', 'pavement',
-               'tree', 'signsymbol', 'fence', 'car',
-               'pedestrian', 'bicyclist', 'unlabelled']
+CLASSES = ['sky', 'road', 'pavement',]
+# CLASSES = ['sky', 'building', 'pole', 'road', 'pavement',
+#                'tree', 'signsymbol', 'fence', 'car',
+#                'pedestrian', 'bicyclist', 'unlabelled']
 class_intervals = np.ones((len(CLASSES)))
-class_intervals[1] = 1e6
-np.random.seed(0)
+# class_intervals[1] = 1e6
 class_values = [np.uint8(255 * np.random.rand(1, 3)) for c in CLASSES]
-ACTIVATION = 'softmax2d'  # 'sigmoid'  # could be None for logits or 'softmax2d' for multiclass segmentation
+ACTIVATION = None  # 'softmax2d'  # 'sigmoid'  # could be None for logits or 'softmax2d' for multiclass segmentation
 DEVICE = 'cuda'
 
 # create segmentation model with pretrained encoder
@@ -275,7 +274,7 @@ valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=False, num_worker
 # IoU/Jaccard score - https://en.wikipedia.org/wiki/Jaccard_index
 
 # loss = smp.utils.losses.DiceLoss()
-loss = smp.utils.losses.CrossEntropyLoss(class_intervals=class_intervals)
+loss = smp.utils.losses.CrossEntropyLoss(class_intervals=class_intervals, activation='softmax2d')
 metrics = [
     smp.utils.metrics.IoU(threshold=0.5),
 ]
@@ -310,7 +309,7 @@ valid_epoch = smp.utils.train.ValidEpoch(
 # train model for 40 epochs
 
 max_score = 0
-iter_num = 0
+iter_num = 20
 for i in range(0, iter_num):
 
     print('\nEpoch: {}'.format(i))
@@ -327,8 +326,8 @@ for i in range(0, iter_num):
         optimizer.param_groups[0]['lr'] = 1e-5
         print('Decrease decoder learning rate to 1e-5!')
 
+raise Exception
 ## Test best saved model
-
 # load best saved checkpoint
 best_model = torch.load('./best_model.pth')
 

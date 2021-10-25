@@ -1,7 +1,5 @@
 import torch
 from . import initialization as init
-from examples.mboaz17.conf_utils.hist import calc_hist
-from examples.mboaz17.conf_utils.histogramdd import histogramdd
 import torch.nn.functional as F
 
 class SegmentationModel(torch.nn.Module):
@@ -16,42 +14,34 @@ class SegmentationModel(torch.nn.Module):
         """Sequentially pass `x` trough model`s encoder, decoder and heads"""
         features = self.encoder(x)
 
-        if conf_obj:
-            hist_list = []
-            for ind in range(conf_obj.stage_end):
-                if conf_obj.stages_valid[ind]:
-                    b, ch, r, c = features[ind].shape
-                    dims_num = 4
-                    features_reshaped = features[ind].view((b, dims_num, int(ch/dims_num), r, c))
-                    features_projected = torch.mean(features_reshaped, dim=2)
-                    features_projected_flattened = features_projected.view((dims_num, -1))
-
-                    edges = torch.tensor((0, 1e-6, 1e-2, 1e-1, 1e0, 1e1, 1e10), device=features_projected.device)
-                    tmp = histogramdd(features_projected_flattened, edges=edges)
-
-                    hist_tensor = calc_hist(features[ind], win_size_half=win_size_half, edges=[0, 1e-6, 1e-2, 1e-1, 1e0, 1e1, 1e10])
-                    hist_list.append((hist_tensor))
-                    if mode == 'update':
-                        if y is not None:
-                            y_downscaled = F.interpolate(y, (hist_tensor.shape[2], hist_tensor.shape[3]), mode='nearest')
-                            class_indices = (y_downscaled[0, 1, :, :] < torch.tensor(0.5, device='cuda')).nonzero()
-                            hist_mean = torch.mean(hist_tensor[:, :, class_indices[:,0], class_indices[:,1]], dim=-1)
-                        else:
-                            hist_mean = torch.mean(hist_tensor, dim=(2, 3))
-                        conf_obj.hist_list[ind] += hist_mean
-                else:
-                    hist_list.append(0)
-
         decoder_output = self.decoder(*features)
 
         masks = self.segmentation_head(decoder_output)
+        if conf_obj and mode == 'update':
+            max_vals, _ = torch.max(y.squeeze(), dim=0)
+            tagged_indices = (max_vals).nonzero()
+            if len(tagged_indices):
+                b, ch, r, c = masks.shape
+                dims_num = ch
+                # features_flattened = masks.view((dims_num, -1))
+                features_flattened = masks[:, :, tagged_indices[:, 0], tagged_indices[:, 1]].squeeze()
+                edges = torch.tensor(conf_obj.edges_list, device=features_flattened.device)
+                # histogram, _ = histogramdd(features_flattened, edges=edges)
+                histogram = conf_obj.calc_hist(features_flattened)
+                histogram = histogram.float()
+                conf_obj.histogram_1d += histogram
+                conf_obj.samples_num += features_flattened.shape[1]
+                quantiles = torch.quantile(features_flattened, torch.linspace(0, 1, 11, device=features_flattened.device))
+                conf_obj.quantiles += quantiles
 
         if self.classification_head is not None:
             labels = self.classification_head(features[-1])
             return masks, labels
 
         if conf_obj and mode == 'compare':
-            score_map = conf_obj.compare_hist_to_model(hist_list, image_size=(x.size(2), x.size(3)))
+            score_map = conf_obj.compare_hist_to_model(masks)
+            # in case of Identity() activation
+            masks = torch.nn.functional.softmax(masks, dim=1)
             return masks, score_map
 
         return masks

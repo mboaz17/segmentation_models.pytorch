@@ -1,46 +1,76 @@
 import torch
 import torch.nn.functional as F
+import numpy as np
 
 class ConfEst:
 
     def __init__(self):
-        self.dims_num = 2
-        self.stages_valid = [0, 1, 1, 1, 1, 1]
-        self.stage_end = len(self.stages_valid)
-        self.hist_list = []
-        for ind in range(self.stage_end):
-            self.hist_list.append(0)
+        self.histogram = 0.0
+        self.histogram_1d = 0.0
+        self.quantiles = 0.0
+        self.samples_num = 0
+        # self.edges_list = [-1e6] + list(np.linspace(-5,5,11)) + [1e6]
+        self.edges_list = [-1e6] + [-10.5, -7, -5.5, -4.5, -2, 0, 3, 5, 7.5] + [1e6]
+        # [-19.3564, -10.7485, -7.1572, -5.7219, -4.4656, -1.9554, 0.1445,
+        #  2.7789, 4.8235, 7.5348, 19.4049]
 
-        self.edges_list = []
-        for d in range(self.dims_num):
-            self.edges_list.append([0, 1e-6, 1e-2, 1e-1, 1e0, 1e1, 1e10])
+    def calc_hist(self, x):
+        # x is a tensor with shape [channels_num, samples_num]
 
-    def compare_hist_to_model(self, hist_list=[], image_size=(0, 0)):
-        assert len(self.hist_list) == len(hist_list)
+        edges = torch.tensor(self.edges_list, device=x.device)
+        edges_num = len(edges)
+        dims_num = x.shape[0]
+        hist_indices_map = torch.zeros(size=(dims_num, x.size(1)), device=x.device, dtype=torch.int)
+        hist_indices_map_1d = torch.zeros(x.size(1), device=x.device, dtype=torch.int)
 
-        score_map = 0
-        total_weight = 0
-        for ind in range(len(hist_list)):
-            if self.stages_valid[ind]:
-                hist_norm1 = torch.norm(self.hist_list[ind])
-                hist_norm2 = torch.norm(hist_list[ind], dim=1).unsqueeze(dim=1)
-                total_weight += self.stages_valid[ind]
-                if self.criterion == 'inner_product':
-                    score_curr = torch.sum(self.hist_list[ind].unsqueeze(dim=2).unsqueeze(dim=3) * hist_list[ind], dim=1).unsqueeze(dim=1)
-                    score_curr /= (hist_norm1 * hist_norm2)
-                    score_curr = F.pad(score_curr, (self.win_half_size_list[ind][1], self.win_half_size_list[ind][1],
-                                       self.win_half_size_list[ind][0], self.win_half_size_list[ind][0]), 'constant', 0)
-                    score_map += self.stages_valid[ind] * F.interpolate(score_curr, image_size, mode="bilinear", align_corners=True)
-        score_map /= total_weight
+        for ch in range(dims_num):
+            total = 0
+            for ind in range(edges_num - 1):
+                low = edges[ind]
+                high = edges[ind + 1]
+                x_curr = x[ch]
+                mask_curr = (x_curr >= low) & (x_curr < high)
+                indices = mask_curr.nonzero()
+                total += len(indices)
+                hist_indices_map[ch, indices] = ind
+            hist_indices_map_1d += ((edges_num-1)**ch) * hist_indices_map[ch]
+
+        histogram_1d = torch.zeros((edges_num-1)**dims_num, device=x.device, dtype=torch.int)
+        for ind in range(hist_indices_map_1d.min(), hist_indices_map_1d.max()+1, 1):
+            indices = (hist_indices_map_1d == ind).nonzero()
+            if len(indices):
+                histogram_1d[ind] = len(indices)
+
+        return histogram_1d
+
+
+    def compare_hist_to_model(self, x):
+
+        edges = self.edges_list
+        edges_num = len(edges)
+        dims_num = x.shape[1]
+        hist_indices_map = torch.zeros(size=(dims_num, x.size(2), x.size(3)), device=x.device, dtype=torch.int)
+        hist_indices_map_1d = torch.zeros(size=(x.size(2), x.size(3)), device=x.device, dtype=torch.int)
+        score_map = torch.zeros(size=(x.size(2), x.size(3)), device=x.device, dtype=torch.float32)
+
+        for ch in range(dims_num):
+            total = 0
+            for ind in range(edges_num - 1):
+                low = edges[ind]
+                high = edges[ind + 1]
+                x_curr = x[0, ch]
+                mask_curr = (x_curr >= low) & (x_curr < high)
+                indices = mask_curr.nonzero()
+                total += len(indices[:, 0])
+                hist_indices_map[ch, indices[:, 0], indices[:, 1]] = ind
+            hist_indices_map_1d += ((edges_num-1)**ch) * hist_indices_map[ch]
+
+        for ind in range(hist_indices_map_1d.min(), hist_indices_map_1d.max()+1, 1):
+            indices = (hist_indices_map_1d == ind).nonzero()
+            score_map[indices[:, 0], indices[:, 1]] = self.histogram_1d[ind]
+
         return score_map
 
     def normalize_hist_after_batch(self, iterations_num=1):
-        for ind in range(self.stage_end):
-            self.hist_list[ind] /= iterations_num
-
-
-    def calc_hist(self, x):
-
-        assert x.shape[1] == self.dims_num
-
-
+        self.histogram_1d /= self.samples_num
+        self.quantiles /= iterations_num

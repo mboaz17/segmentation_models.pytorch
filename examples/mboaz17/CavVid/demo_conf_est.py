@@ -1,5 +1,6 @@
 import os
 import pickle
+import torch.nn as nn
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
@@ -9,7 +10,7 @@ import matplotlib.pyplot as plt
 from examples.mboaz17.conf_utils.conf_est import ConfEst
 
 # %%
-
+np.random.seed(0)
 DATA_DIR = '../../data/CamVid/'
 
 # load repo with data if it is not exists
@@ -234,15 +235,14 @@ import segmentation_models_pytorch as smp
 
 ENCODER = 'se_resnext50_32x4d'
 ENCODER_WEIGHTS = 'imagenet'
-# CLASSES = ['car']
-CLASSES = ['sky', 'building', 'pole', 'road', 'pavement',
-               'tree', 'signsymbol', 'fence', 'car',
-               'pedestrian', 'bicyclist', 'unlabelled']
+CLASSES = ['sky', 'road', 'pavement',]
+# CLASSES = ['sky', 'building', 'pole', 'road', 'pavement',
+#                'tree', 'signsymbol', 'fence', 'car',
+#                'pedestrian', 'bicyclist', 'unlabelled']
 class_intervals = np.ones((len(CLASSES)))
-class_intervals[1] = 1e6
-np.random.seed(0)
+# class_intervals[1] = 1e6
 class_values = [np.uint8(255 * np.random.rand(1, 3)) for c in CLASSES]
-ACTIVATION = 'softmax2d'  # 'sigmoid'  # could be None for logits or 'softmax2d' for multiclass segmentation
+ACTIVATION = None  # 'softmax2d'  # 'sigmoid'  # could be None for logits or 'softmax2d' for multiclass segmentation
 DEVICE = 'cuda'
 
 # create segmentation model with pretrained encoder
@@ -279,7 +279,7 @@ conf_loader = DataLoader(conf_dataset, batch_size=1, shuffle=False, num_workers=
 # IoU/Jaccard score - https://en.wikipedia.org/wiki/Jaccard_index
 
 # loss = smp.utils.losses.DiceLoss()
-loss = smp.utils.losses.CrossEntropyLoss(class_intervals=class_intervals)
+loss = smp.utils.losses.CrossEntropyLoss(class_intervals=class_intervals, activation='softmax2d')
 metrics = [
     smp.utils.metrics.IoU(threshold=0.5),
 ]
@@ -298,7 +298,7 @@ conf_obj = ConfEst()
 # run model for 1 epoch
 
 max_score = 0
-iter_num = 0
+iter_num = 1
 for i in range(0, iter_num):
     # train_logs = train_epoch.run(train_loader, conf_obj=conf_obj)
     valid_logs = valid_epoch.run(conf_loader, conf_obj=conf_obj)
@@ -350,7 +350,6 @@ test_dataset_vis = Dataset(
 
 # %%
 
-
 for i in range(20):
     n = np.random.choice(len(test_dataset))
 
@@ -362,16 +361,18 @@ for i in range(20):
     v_pad = int((shape_new[1] - shape_orig[1])/2)
 
     gt_mask = gt_mask.squeeze()
+    max_vals = gt_mask.max(axis=0)
     gt_mask = gt_mask.argmax(axis=0)
+
     gt_mask = gt_mask[h_pad:shape_new[0]-h_pad, v_pad:shape_new[1]-v_pad]
+    max_vals = max_vals[h_pad:shape_new[0]-h_pad, v_pad:shape_new[1]-v_pad]
+    untagged_indices = (max_vals == 0).nonzero()
 
     x_tensor = torch.from_numpy(image).to(DEVICE).unsqueeze(0)
-
     pr_mask, score_map = best_model.predict(x_tensor, conf_obj=conf_obj, mode='compare')
     pr_score = (pr_mask.squeeze().cpu().numpy()).max(axis=0)
-    pr_mask = (pr_mask.squeeze().cpu().numpy().round())
+    pr_mask = (pr_mask.squeeze().cpu().numpy().round()).argmax(axis=0)
     score_map = (score_map.squeeze().cpu().numpy())
-    pr_mask = pr_mask.argmax(axis=0)
     pr_mask = pr_mask[h_pad:shape_new[0]-h_pad, v_pad:shape_new[1]-v_pad]
     pr_mask_vis = 0*image_vis
     gt_mask_vis = 0*image_vis
@@ -381,14 +382,17 @@ for i in range(20):
         pr_mask_vis[inds[0], inds[1], :] = class_values[i]
         inds = (gt_mask == i).nonzero()
         gt_mask_vis[inds[0], inds[1], :] = class_values[i]
+    gt_mask_vis[untagged_indices[0], untagged_indices[1], :] = 0
 
     visualize(
         image=image_vis,
         ground_truth_mask=gt_mask_vis,
         predicted_mask=pr_mask_vis,
-        softmax_score=pr_score,
-        score_map=score_map,
+        softmax_score=pr_score > 0.99,  # np.percentile(pr_score, 50),
+        score_map=score_map > 0.01,  # np.percentile(score_map, 50),
     )
+    print(np.percentile(pr_score, 60))
+    print(np.percentile(score_map, 60))
 
 # TODO: for imporiving confidnece scores
 # * Estimate one histogram model per class?
