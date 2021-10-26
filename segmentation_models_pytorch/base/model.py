@@ -17,30 +17,31 @@ class SegmentationModel(torch.nn.Module):
         decoder_output = self.decoder(*features)
 
         masks = self.segmentation_head(decoder_output)
+
         if conf_obj and mode == 'update':
-            max_vals, _ = torch.max(y.squeeze(), dim=0)
-            tagged_indices = (max_vals).nonzero()
-            if len(tagged_indices):
-                b, ch, r, c = masks.shape
-                dims_num = ch
-                # features_flattened = masks.view((dims_num, -1))
-                features_flattened = masks[:, :, tagged_indices[:, 0], tagged_indices[:, 1]].squeeze()
-                edges = torch.tensor(conf_obj.edges_list, device=features_flattened.device)
-                # histogram, _ = histogramdd(features_flattened, edges=edges)
-                histogram = conf_obj.calc_hist(features_flattened)
-                histogram = histogram.float()
-                conf_obj.histogram_1d += histogram
-                conf_obj.samples_num += features_flattened.shape[1]
-                quantiles = torch.quantile(features_flattened, torch.linspace(0, 1, 11, device=features_flattened.device))
-                conf_obj.quantiles += quantiles
+            b, dims_num, r, c = masks.shape
+            for cls in range(conf_obj.classes_num):
+
+                indices_curr = (y[0, cls]).nonzero()
+                if len(indices_curr):
+                    # features_flattened = masks.view((dims_num, -1))
+                    features_flattened = masks[:, :, indices_curr[:, 0], indices_curr[:, 1]].squeeze()
+                    histogram_1d = conf_obj.calc_hist(features_flattened, cls)
+                    conf_obj.histogram_1d[cls] += histogram_1d
+                    conf_obj.samples_num[cls] += features_flattened.shape[1]
+                    quantile_edges = torch.linspace(0, 1, 11, device=features_flattened.device)
+                    quantiles = torch.quantile(features_flattened, quantile_edges)
+                    conf_obj.quantiles[cls] += features_flattened.shape[1] * quantiles
 
         if self.classification_head is not None:
             labels = self.classification_head(features[-1])
             return masks, labels
 
         if conf_obj and mode == 'compare':
-            score_map = conf_obj.compare_hist_to_model(masks)
-            # in case of Identity() activation
+            score_map = torch.zeros(size=(conf_obj.classes_num, masks.size(2), masks.size(3)), device=masks.device)
+            for cls in range(conf_obj.classes_num):
+                score_map[cls] = conf_obj.compare_hist_to_model(masks, cls)
+                # in case of Identity() activation
             masks = torch.nn.functional.softmax(masks, dim=1)
             return masks, score_map
 

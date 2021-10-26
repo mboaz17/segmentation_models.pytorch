@@ -63,7 +63,7 @@ import segmentation_models_pytorch as smp
 
 ENCODER = 'se_resnext50_32x4d'
 ENCODER_WEIGHTS = 'imagenet'
-CLASSES = [CamvidDataset.CLASSES[i] for i in [0, 3, 4]]
+CLASSES = [CamvidDataset.CLASSES[i] for i in [0, 1, 3]]
 # CLASSES_Camvid = ['sky', 'building', 'pole', 'road', 'pavement',
 #                'tree', 'signsymbol', 'fence', 'car',
 #                'pedestrian', 'bicyclist', 'unlabelled']
@@ -74,12 +74,6 @@ ACTIVATION = None  # 'softmax2d'  # 'sigmoid'  # could be None for logits or 'so
 DEVICE = 'cuda'
 
 # create segmentation model with pretrained encoder
-model = smp.FPN(
-    encoder_name=ENCODER,
-    encoder_weights=ENCODER_WEIGHTS,
-    classes=len(CLASSES),
-    activation=ACTIVATION,
-)
 model = torch.load('./best_model.pth')
 
 preprocessing_fn = smp.encoders.get_preprocessing_fn(ENCODER, ENCODER_WEIGHTS)
@@ -121,7 +115,7 @@ valid_epoch = smp.utils.train.ValidEpoch(
 )
 
 ## Define a confidence object
-conf_obj = ConfEst()
+conf_obj = ConfEst(classes_num=len(CLASSES))
 
 # run model for 1 epoch
 
@@ -147,8 +141,8 @@ best_model = torch.load('./best_model.pth')
 
 # create test dataset
 test_dataset = CamvidDataset(
-    x_test_dir, y_test_dir,
-    # x_train_dir, y_train_dir,
+    # x_test_dir, y_test_dir,
+    x_train_dir, y_train_dir,
     augmentation=get_validation_augmentation(),
     preprocessing=get_preprocessing(preprocessing_fn),
     classes=CLASSES,
@@ -171,8 +165,8 @@ test_epoch = smp.utils.train.ValidEpoch(
 ## Visualize predictions
 # test dataset without transformations for image visualization
 test_dataset_vis = CamvidDataset(
-    x_test_dir, y_test_dir,
-    # x_train_dir, y_train_dir,
+    # x_test_dir, y_test_dir,
+    x_train_dir, y_train_dir,
     classes=CLASSES,
 )
 
@@ -209,11 +203,11 @@ for i in range(20):
     if dataset_mode == 'from_dataset':
         gt_mask = gt_mask.squeeze()
         max_vals = gt_mask.max(axis=0)
+        gt_mask = gt_mask.argmax(axis=0)
     else:
         gt_mask = np.zeros((image.shape[1], image.shape[2]))
         max_vals = np.zeros((image.shape[1], image.shape[2]))
 
-    # gt_mask = gt_mask.argmax(axis=0)
     gt_mask = gt_mask[h_pad:shape_new[0]-h_pad, v_pad:shape_new[1]-v_pad]
     max_vals = max_vals[h_pad:shape_new[0]-h_pad, v_pad:shape_new[1]-v_pad]
     untagged_indices = (max_vals == 0).nonzero()
@@ -221,8 +215,8 @@ for i in range(20):
     x_tensor = torch.from_numpy(image).to(DEVICE).unsqueeze(0)
     pr_mask, score_map = best_model.predict(x_tensor, conf_obj=conf_obj, mode='compare')
     pr_score = (pr_mask.squeeze().cpu().numpy()).max(axis=0)
+    score_map = score_map.squeeze().cpu().numpy()
     pr_mask = (pr_mask.squeeze().cpu().numpy().round()).argmax(axis=0)
-    score_map = (score_map.squeeze().cpu().numpy())
     pr_mask = pr_mask[h_pad:shape_new[0]-h_pad, v_pad:shape_new[1]-v_pad]
     pr_mask_vis = 0*image_vis
     gt_mask_vis = 0*image_vis
@@ -234,15 +228,21 @@ for i in range(20):
         gt_mask_vis[inds[0], inds[1], :] = class_values[i]
     gt_mask_vis[untagged_indices[0], untagged_indices[1], :] = 0
 
+    for cls in range(conf_obj.classes_num):
+        visualize(
+            image=image_vis,
+            ground_truth_mask=gt_mask_vis,
+            predicted_mask=pr_mask_vis,
+            softmax_score=pr_score,  # np.percentile(pr_score, 50),
+            score_map=score_map[cls],  # np.percentile(score_map, 50),
+        )
     visualize(
         image=image_vis,
         ground_truth_mask=gt_mask_vis,
         predicted_mask=pr_mask_vis,
-        softmax_score=pr_score > 0.99,  # np.percentile(pr_score, 50),
-        score_map=score_map > 0.01,  # np.percentile(score_map, 50),
+        softmax_score=pr_score>0.995,  # np.percentile(pr_score, 50),
+        score_map=score_map.max(axis=0) > 0.015,  # np.percentile(score_map, 50),
     )
-    print(np.percentile(pr_score, 60))
-    print(np.percentile(score_map, 60))
 
 # TODO: for imporiving confidnece scores
 # * Estimate one histogram model per class?

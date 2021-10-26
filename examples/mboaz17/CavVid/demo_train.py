@@ -60,7 +60,7 @@ import segmentation_models_pytorch as smp
 
 ENCODER = 'se_resnext50_32x4d'
 ENCODER_WEIGHTS = 'imagenet'
-CLASSES = [CamvidDataset.CLASSES[i] for i in [0, 3, 4]]
+CLASSES = [CamvidDataset.CLASSES[i] for i in [0, 1, 3]]
 # CLASSES_Camvid = ['sky', 'building', 'pole', 'road', 'pavement',
 #                'tree', 'signsymbol', 'fence', 'car',
 #                'pedestrian', 'bicyclist', 'unlabelled']
@@ -160,44 +160,3 @@ for i in range(0, iter_num):
     if i == 25:
         optimizer.param_groups[0]['lr'] = 1e-5
         print('Decrease decoder learning rate to 1e-5!')
-
-raise Exception
-## Test best saved model
-
-# load best saved checkpoint
-best_model = torch.load('./best_model.pth')
-
-# %%
-
-# create test dataset
-test_dataset = CamvidDataset(
-    x_test_dir, y_test_dir,
-    # x_train_dir, y_train_dir,
-    augmentation=get_validation_augmentation(),
-    preprocessing=get_preprocessing(preprocessing_fn),
-    classes=CLASSES,
-)
-
-test_dataloader = DataLoader(test_dataset)
-
-# %%
-
-# evaluate model on test set
-test_epoch = smp.utils.train.ValidEpoch(
-    model=best_model,
-    loss=loss,
-    metrics=metrics,
-    device=DEVICE,
-)
-
-# logs = test_epoch.run(test_dataloader)
-
-## Visualize predictions
-# test dataset without transformations for image visualization
-test_dataset_vis = CamvidDataset(
-    x_test_dir, y_test_dir,
-    # x_train_dir, y_train_dir,
-    classes=CLASSES,
-)
-
-# %%
