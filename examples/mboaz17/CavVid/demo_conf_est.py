@@ -174,8 +174,14 @@ test_dataset_vis = CamvidDataset(
 
 # dataset_mode = 'from_dataset'
 dataset_mode = 'from_folder'
+## KITTI
 # images_folder = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Kitti/2011_09_26_drive_0001_extract/image_02/data'
-images_folder = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Kitti/2011_09_26_drive_0009_extract/image_02/data'
+# images_folder = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Kitti/2011_09_26_drive_0009_extract/image_02/data'
+## AIRSIM
+# images_folder = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Airsim/train'
+## ALTA
+# images_folder = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Alta/train'
+images_folder = '/media/isl12/Alta/V7_Exp_25_1_21/Agamim/Path/B/100'
 
 for i in range(20):
 
@@ -193,7 +199,10 @@ for i in range(20):
         shape_orig = image_vis.shape[:2]
         # Apply the same steps on the image as for an image from the dataset
         image_vis = cv2.cvtColor(image_vis, cv2.COLOR_BGR2RGB)
-        image = get_augmentation_for_kitti()(image=image_vis)['image']
+        if 'Airsim' in images_folder or 'Alta' in images_folder:
+            image = get_augmentation_for_Airsim()(image=image_vis)['image']
+        else:
+            image = get_augmentation_for_kitti()(image=image_vis)['image']
         image = get_preprocessing(preprocessing_fn)(image=image)['image']
 
     shape_new = image.shape[1:]
@@ -240,7 +249,7 @@ for i in range(20):
         image=image_vis,
         ground_truth_mask=gt_mask_vis,
         predicted_mask=pr_mask_vis,
-        softmax_score=pr_score>0.995,  # np.percentile(pr_score, 50),
+        softmax_score=pr_score>0.95,  # np.percentile(pr_score, 50),
         score_map=score_map.max(axis=0) > 0.015,  # np.percentile(score_map, 50),
     )
 

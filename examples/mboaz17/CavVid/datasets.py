@@ -4,7 +4,7 @@ import numpy as np
 from torch.utils.data import Dataset as BaseDataset
 # import airsim
 import os
-
+# import mpldatacursor
 
 class CamvidDataset(BaseDataset):
     """CamVid Dataset. Read images, apply augmentation and preprocessing transformations.
@@ -215,6 +215,15 @@ def get_augmentation_for_kitti():
     ]
     return albu.Compose(test_transform)
 
+
+def get_augmentation_for_Airsim():
+    """Add paddings to make image shape divisible by 32"""
+    test_transform = [
+        albu.PadIfNeeded(1088, 1440)
+    ]
+    return albu.Compose(test_transform)
+
+
 def get_conf_augmentation():
     """Add paddings to make image shape divisible by 32"""
     test_transform = [
@@ -255,4 +264,5 @@ def visualize(**images):
         plt.yticks([])
         plt.title(' '.join(name.split('_')).title())
         plt.imshow(image)
+        # mpldatacursor.datacursor(hover=True, bbox=dict(alpha=1, fc='w'))
     plt.show()
