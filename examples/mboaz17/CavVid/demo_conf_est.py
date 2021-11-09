@@ -79,6 +79,13 @@ model = torch.load('./best_model.pth')
 preprocessing_fn = smp.encoders.get_preprocessing_fn(ENCODER, ENCODER_WEIGHTS)
 
 # %%
+train_dataset = CamvidDataset(
+    x_train_dir,
+    y_train_dir,
+    augmentation=get_training_augmentation(),
+    preprocessing=get_preprocessing(preprocessing_fn),
+    classes=CLASSES,
+)
 conf_dataset = CamvidDataset(
     x_train_dir,
     y_train_dir,
@@ -92,7 +99,8 @@ conf_dataset = CamvidDataset(
 #     image, mask = conf_dataset[1]
 #     visualize(image=image) #, mask=mask.squeeze(-1))
 
-conf_loader = DataLoader(conf_dataset, batch_size=1, shuffle=False, num_workers=0)
+train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=0)
+# conf_loader = DataLoader(conf_dataset, batch_size=1, shuffle=False, num_workers=0)
 # valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=False, num_workers=4)
 
 # %%
@@ -117,13 +125,15 @@ valid_epoch = smp.utils.train.ValidEpoch(
 ## Define a confidence object
 conf_obj = ConfEst(classes_num=len(CLASSES))
 
-# run model for 1 epoch
+## Load a trained vae model
+with open('./vae_model.pkl', 'rb') as input:
+    vae_obj = pickle.load(input)
 
+# run model for 1 epoch
 max_score = 0
 iter_num = 0
 for i in range(0, iter_num):
-    # train_logs = train_epoch.run(train_loader, conf_obj=conf_obj)
-    valid_logs = valid_epoch.run(conf_loader, conf_obj=conf_obj)
+    valid_logs = valid_epoch.run(train_loader, conf_obj=conf_obj, vae_obj=vae_obj)
     with open('./conf_model.pkl', 'wb') as output:
         pickle.dump(conf_obj, output, pickle.HIGHEST_PROTOCOL)
         print('confidence model saved')
@@ -172,8 +182,8 @@ test_dataset_vis = CamvidDataset(
 
 # %%
 
-# dataset_mode = 'from_dataset'
-dataset_mode = 'from_folder'
+dataset_mode = 'from_dataset'
+# dataset_mode = 'from_folder'
 ## KITTI
 # images_folder = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Kitti/2011_09_26_drive_0001_extract/image_02/data'
 # images_folder = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Kitti/2011_09_26_drive_0009_extract/image_02/data'
@@ -222,7 +232,7 @@ for i in range(20):
     untagged_indices = (max_vals == 0).nonzero()
 
     x_tensor = torch.from_numpy(image).to(DEVICE).unsqueeze(0)
-    pr_mask, score_map = best_model.predict(x_tensor, conf_obj=conf_obj, mode='compare')
+    pr_mask, score_map = best_model.predict(x_tensor, conf_obj=conf_obj, vae_obj=vae_obj, mode='compare')
     pr_score = (pr_mask.squeeze().cpu().numpy()).max(axis=0)
     score_map = score_map.squeeze().cpu().numpy()
     pr_mask = (pr_mask.squeeze().cpu().numpy().round()).argmax(axis=0)
@@ -237,7 +247,7 @@ for i in range(20):
         gt_mask_vis[inds[0], inds[1], :] = class_values[i]
     gt_mask_vis[untagged_indices[0], untagged_indices[1], :] = 0
 
-    for cls in range(conf_obj.classes_num):
+    for cls in range(score_map.shape[0]):
         visualize(
             image=image_vis,
             ground_truth_mask=gt_mask_vis,
@@ -245,13 +255,13 @@ for i in range(20):
             softmax_score=pr_score,  # np.percentile(pr_score, 50),
             score_map=score_map[cls],  # np.percentile(score_map, 50),
         )
-    visualize(
-        image=image_vis,
-        ground_truth_mask=gt_mask_vis,
-        predicted_mask=pr_mask_vis,
-        softmax_score=pr_score>0.95,  # np.percentile(pr_score, 50),
-        score_map=score_map.max(axis=0) > 0.015,  # np.percentile(score_map, 50),
-    )
+    # visualize(
+    #     image=image_vis,
+    #     ground_truth_mask=gt_mask_vis,
+    #     predicted_mask=pr_mask_vis,
+    #     softmax_score=pr_score>0.95,  # np.percentile(pr_score, 50),
+    #     score_map=score_map.max(axis=0) > 0.015,  # np.percentile(score_map, 50),
+    # )
 
 # TODO: for imporiving confidnece scores
 # * Estimate one histogram model per class?

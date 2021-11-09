@@ -2,6 +2,7 @@ import sys
 import torch
 from tqdm import tqdm as tqdm
 from .meter import AverageValueMeter
+import examples.mboaz17.conf_utils.vae as vae
 
 
 class Epoch:
@@ -33,7 +34,7 @@ class Epoch:
     def on_epoch_start(self):
         pass
 
-    def run(self, dataloader, conf_obj=None):
+    def run(self, dataloader, conf_obj=None, vae_obj=None):
 
         self.on_epoch_start()
 
@@ -44,10 +45,7 @@ class Epoch:
         with tqdm(dataloader, desc=self.stage_name, file=sys.stdout, disable=not (self.verbose)) as iterator:
             for x, y in iterator:
                 x, y = x.to(self.device), y.to(self.device)
-                if conf_obj:
-                    loss, y_pred = self.batch_update(x, y, conf_obj=conf_obj)
-                else:
-                    loss, y_pred = self.batch_update(x, y)
+                loss, y_pred = self.batch_update(x, y, conf_obj=conf_obj, vae_obj=vae_obj)
 
                 # update loss logs
                 loss_value = loss.cpu().detach().numpy()
@@ -88,13 +86,22 @@ class TrainEpoch(Epoch):
     def on_epoch_start(self):
         self.model.train()
 
-    def batch_update(self, x, y):
+    def batch_update(self, x, y, conf_obj=None, vae_obj=None):
         self.optimizer.zero_grad()
-        prediction = self.model.forward(x)
+        if vae_obj:
+            prediction, vae_input, vae_output, vae_mean, vae_logvar, loss_vae = self.model.forward(x, y=y, conf_obj=conf_obj, vae_obj=vae_obj, mode='update')
+            # loss_vae = vae.vae_loss(vae_output, vae_input, vae_mean, vae_logvar)
+            print(loss_vae)
+            # print(vae_obj.encoder[0].weight[:3,0,0,0])
+            # loss_vae.backward(retain_graph=True)
+        else:
+            prediction = self.model.forward(x)
+
         loss = self.loss(prediction, y)
-        loss.backward()
+        loss_total = loss + 0.1*loss_vae
+        loss_total.backward()
         self.optimizer.step()
-        return loss, prediction
+        return loss_total, prediction
 
 
 class ValidEpoch(Epoch):
@@ -112,8 +119,11 @@ class ValidEpoch(Epoch):
     def on_epoch_start(self):
         self.model.eval()
 
-    def batch_update(self, x, y, conf_obj=None):
+    def batch_update(self, x, y, conf_obj=None, vae_obj=None):
         with torch.no_grad():
-            prediction = self.model.forward(x, y=y, conf_obj=conf_obj, mode='update')
+            if vae_obj:
+                prediction, vae_input, vae_output, vae_mean, vae_logvar, loss_vae = self.model.forward(x, y=y, conf_obj=conf_obj, vae_obj=vae_obj,mode='update')
+            else:
+                prediction = self.model.forward(x)
             loss = self.loss(prediction, y)
         return loss, prediction
