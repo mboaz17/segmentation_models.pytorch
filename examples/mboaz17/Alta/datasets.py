@@ -19,20 +19,26 @@ class Dataset(BaseDataset):
     """
 
     CLASSES = {
-                # '__background__': (0, 0, 0),
-                'other objects': (255, 50, 50),
-                'pole': (255, 187, 50),
-                'rough terrain': (187, 255, 50),
-                'soft terrain': (50, 255, 50),
-                'transportation terrain': (50, 255, 186),
-                'vegetation': (50, 186, 255),
-                'vehicle': (50, 50, 255),
-                'walking terrain': (187, 50, 255)
-               }
-
+        # '__background__': (0, 0, 0),
+        'bicycle': (255, 50, 50),
+        'building': (255, 127, 50),
+        'fence': (255, 204, 50),
+        'other objects': (229, 255, 50),
+        'person': (153, 255, 50),
+        'pole': (76, 255, 50),
+        'rough terrain': (50, 255, 101),
+        'shed': (50, 255, 178),
+        'soft terrain': (50, 255, 255),
+        'stairs': (50, 178, 255),
+        'transportation terrain': (50, 101, 255),
+        'vegetation': (76, 50, 255),
+        'vehicle': (153, 50, 255),
+        'walking terrain': (229, 50, 255),
+        'water': (255, 50, 204),
+    }
     # samples_num_all = [1822091, 4697038, 5583920]
     # class_intervals = samples_num_all / np.min(samples_num_all)
-    class_intervals = [1, 1, 1, 50, 50, 50, 1, 50]
+    class_intervals = [1, 50, 1, 1, 1, 1, 50, 1, 50, 1, 50, 50, 1, 50, 1]
     def __init__(
             self,
             images_dir,

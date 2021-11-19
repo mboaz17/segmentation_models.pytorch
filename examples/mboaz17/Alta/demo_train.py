@@ -7,20 +7,20 @@ import cv2
 import matplotlib.pyplot as plt
 
 # %%
+# images_dir = '/media/isl12/Alta/V7_Exp_25_1_21'
+# annotations_dir = '/media/isl12/Alta/V7_Exp_25_1_21_annot'
+# dataset_name = 'Agamim/Path/A/30'
 
-DATA_DIR = '../../data/Alta/'
+images_dir = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Alta/train'
+annotations_dir = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Alta/trainannot'
+dataset_name = ''
 
-# %%
-
-x_train_dir = os.path.join(DATA_DIR, 'train')
-y_train_dir = os.path.join(DATA_DIR, 'trainannot')
-
-x_valid_dir = os.path.join(DATA_DIR, 'train')
-y_valid_dir = os.path.join(DATA_DIR, 'trainannot')
-
-x_test_dir = os.path.join(DATA_DIR, 'train')
-y_test_dir = os.path.join(DATA_DIR, 'trainannot')
-
+x_train_dir = os.path.join(images_dir, dataset_name)
+y_train_dir = os.path.join(annotations_dir, dataset_name)
+x_valid_dir = os.path.join(images_dir, dataset_name)
+y_valid_dir = os.path.join(annotations_dir, dataset_name)
+x_test_dir = os.path.join(images_dir, dataset_name)
+y_test_dir = os.path.join(annotations_dir, dataset_name)
 
 # %%
 # helper function for data visualization
@@ -43,11 +43,8 @@ from torch.utils.data import DataLoader
 from datasets import Dataset
 
 # %%
-
 # Lets look at data we have
-
 dataset = Dataset(x_train_dir, y_train_dir, classes=['vegetation'])
-
 # image, mask = dataset[4]  # get some sample
 # visualize(
 #     image=image,
@@ -63,12 +60,12 @@ augmented_dataset = Dataset(
     x_train_dir,
     y_train_dir,
     augmentation=get_training_augmentation(),
-    classes=['vegetation'],
+    classes=['transportation terrain'],
 )
 
 # same image with different random transforms
 # for i in range(3):
-#     image, mask = augmented_dataset[1]
+#     image, mask = augmented_dataset[0]
 #     visualize(image=image, mask=mask.squeeze(-1))
 
 ## Create model and train
@@ -122,8 +119,8 @@ valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=False, num_worker
 # Dice/F1 score - https://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient
 # IoU/Jaccard score - https://en.wikipedia.org/wiki/Jaccard_index
 
-loss = smp.utils.losses.CrossEntropyLoss(class_intervals=train_dataset.class_intervals)
-# loss = smp.utils.losses.DiceLoss()
+# loss = smp.utils.losses.CrossEntropyLoss()  # (class_intervals=train_dataset.class_intervals)
+loss = smp.utils.losses.DiceLoss()
 metrics = [
     smp.utils.metrics.IoU(threshold=0.5),
 ]
@@ -158,16 +155,16 @@ valid_epoch = smp.utils.train.ValidEpoch(
 # train model for 40 epochs
 
 max_score = 0
-iter_num = 0
+iter_num = 40
 for i in range(0, iter_num):
 
     print('\nEpoch: {}'.format(i))
     train_logs = train_epoch.run(train_loader)
-    valid_logs = valid_epoch.run(valid_loader)
+    # valid_logs = valid_epoch.run(valid_loader)
 
     # do something (save model, change lr, etc.)
-    if max_score < valid_logs['iou_score']:
-        max_score = valid_logs['iou_score']
+    if 1:  # max_score < valid_logs['iou_score']:
+        # max_score = valid_logs['iou_score']
         torch.save(model, './best_model.pth')
         print('Model saved!')
 
@@ -214,7 +211,7 @@ test_dataset_vis = Dataset(
 
 # %%
 
-for i in range(20):
+for i in range(3):
     n = i  # np.random.choice(len(test_dataset))
 
     image_vis = test_dataset_vis[n][0].astype('uint8')
