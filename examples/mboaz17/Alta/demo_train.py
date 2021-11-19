@@ -120,7 +120,7 @@ valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=False, num_worker
 # IoU/Jaccard score - https://en.wikipedia.org/wiki/Jaccard_index
 
 # loss = smp.utils.losses.CrossEntropyLoss()  # (class_intervals=train_dataset.class_intervals)
-loss = smp.utils.losses.DiceLoss()
+loss = smp.utils.losses.DiceLoss(class_intervals=train_dataset.class_intervals)
 metrics = [
     smp.utils.metrics.IoU(threshold=0.5),
 ]

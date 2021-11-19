@@ -40,7 +40,7 @@ def iou(pr, gt, eps=1e-7, threshold=None, ignore_channels=None):
 jaccard = iou
 
 
-def f_score(pr, gt, beta=1, eps=1e-7, threshold=None, ignore_channels=None):
+def f_score(pr, gt, beta=1, eps=1e-7, threshold=None, ignore_channels=None, class_intervals=None):
     """Calculate F-score between ground truth and prediction
     Args:
         pr (torch.Tensor): predicted tensor
@@ -48,12 +48,29 @@ def f_score(pr, gt, beta=1, eps=1e-7, threshold=None, ignore_channels=None):
         beta (float): positive constant
         eps (float): epsilon to avoid zero division
         threshold: threshold for outputs binarization
+        class_intervals: if None, all class_weights are 1
     Returns:
         float: F score
     """
 
+    if class_intervals is None:
+        class_intervals = np.ones((gt.shape[1]), dtype=np.int32)
+
     pr = _threshold(pr, threshold=threshold)
     pr, gt = _take_channels(pr, gt, ignore_channels=ignore_channels)
+
+    # Balanced classes
+    if 0:
+        pr_sampled = torch.zeros(size=(pr.shape[1], 0), device='cuda', dtype=pr.dtype)
+        gt_sampled = torch.zeros(size=(gt.shape[1], 0), device='cuda', dtype=gt.dtype)
+        for c in range(gt.shape[1]):
+            class_indices = (gt[0, c] > 0.5).nonzero()
+            sampled_indices = torch.linspace(0, len(class_indices)-1, np.int32(len(class_indices) / class_intervals[c])).long()
+            if len(sampled_indices):
+                pr_sampled = torch.cat((pr_sampled, pr[0, :, class_indices[sampled_indices,0], class_indices[sampled_indices,1]]), dim=1)
+                gt_sampled = torch.cat((gt_sampled, gt[0, :, class_indices[sampled_indices,0], class_indices[sampled_indices,1]]), dim=1)
+        pr = pr_sampled
+        gt = gt_sampled
 
     tp = torch.sum(gt * pr)
     fp = torch.sum(pr) - tp
@@ -126,7 +143,7 @@ def recall(pr, gt, eps=1e-7, threshold=None, ignore_channels=None):
 
     return score
 
-def CE(pr, gt, eps=1e-6, threshold=0.5, ignore_channels=None, class_intervals=None):  # <mboaz17>
+def CE(pr, gt, eps=1e-6, threshold=0.5, ignore_channels=None, class_intervals=None):
     """Calculate Cross Entropy score between ground truth and prediction
     Args:
         pr (torch.Tensor): predicted tensor
@@ -165,7 +182,7 @@ def CE(pr, gt, eps=1e-6, threshold=0.5, ignore_channels=None, class_intervals=No
 
 
 
-def BCE(pr, gt, eps=1e-6, threshold=0.5, ignore_channels=None):  # <mboaz17>
+def BCE(pr, gt, eps=1e-6, threshold=0.5, ignore_channels=None):
     """Calculate Binary Cross Entropy score between ground truth and prediction
     Args:
         pr (torch.Tensor): predicted tensor
