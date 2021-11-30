@@ -60,7 +60,7 @@ def f_score(pr, gt, beta=1, eps=1e-7, threshold=None, ignore_channels=None, clas
     pr, gt = _take_channels(pr, gt, ignore_channels=ignore_channels)
 
     # Balanced classes
-    if 0:
+    if 1:
         pr_sampled = torch.zeros(size=(pr.shape[1], 0), device='cuda', dtype=pr.dtype)
         gt_sampled = torch.zeros(size=(gt.shape[1], 0), device='cuda', dtype=gt.dtype)
         for c in range(gt.shape[1]):

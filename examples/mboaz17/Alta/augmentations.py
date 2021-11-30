@@ -8,7 +8,7 @@ def get_training_augmentation():
     train_transform = [
         albu.HorizontalFlip(p=0.5),
         albu.VerticalFlip(p=0.5),
-        albu.ShiftScaleRotate(scale_limit=0.20, rotate_limit=20, shift_limit=0.1, p=1, border_mode=cv2.BORDER_CONSTANT, value=0),
+        # albu.ShiftScaleRotate(scale_limit=0.20, rotate_limit=20, shift_limit=0.1, p=1, border_mode=cv2.BORDER_CONSTANT, value=0),
         # albu.GridDistortion(p=0.5),
         # albu.Resize(*resize_to),
         # albu.ChannelShuffle(),
