@@ -79,6 +79,22 @@ def get_preprocessing(preprocessing_fn):
     return albu.Compose(_transform)
 
 
+def get_augmentation_for_kitti():
+    """Add paddings to make image shape divisible by 32"""
+    test_transform = [
+        albu.PadIfNeeded(512, 1408)
+    ]
+    return albu.Compose(test_transform)
+
+
+def get_augmentation_for_Airsim():
+    """Add paddings to make image shape divisible by 32"""
+    test_transform = [
+        albu.PadIfNeeded(1088, 1440)
+    ]
+    return albu.Compose(test_transform)
+
+
 # Pixel-level transforms
 # Pixel-level transforms will change just an input image and will leave any additional targets such as masks, bounding boxes, and keypoints unchanged. The list of pixel-level transforms:
 #

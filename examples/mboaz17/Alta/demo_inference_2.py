@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 from torch.utils.data import DataLoader
 from datasets import Dataset
-from augmentations import get_training_augmentation, get_validation_augmentation, get_preprocessing
+from augmentations import get_training_augmentation, get_validation_augmentation, get_preprocessing, get_augmentation_for_kitti, get_augmentation_for_Airsim
 
 ## Create model and train
 import torch
@@ -109,24 +109,34 @@ dataset_mode = 'from_folder'
 # images_folder = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Kitti/2011_09_26_drive_0001_extract/image_02/data'
 # images_folder = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Kitti/2011_09_26_drive_0009_extract/image_02/data'
 ## AIRSIM
-images_folder = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Airsim/train'
+# images_folder = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Airsim/train'
+images_folder = '/home/airsim/repos/examples4Alon/Airsim'
 ## ALTA
 # images_folder = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Alta/train'
 # images_folder = '/media/isl12/Alta/V7_Exp_25_1_21/Agamim/Path/B/100'
+# images_folder = '/home/airsim/repos/examples4Alon/Alta/IrYamim_30'
+
+save_dir = '/home/airsim/repos/examples4Alon/temp'
 
 for i in range(20):
 
     if dataset_mode == 'from_dataset':
         n = np.random.choice(len(test_dataset))
         image_vis = test_dataset_vis[n][0].astype('uint8')
+        image_path = test_dataset_vis.images_fps[n]
         shape_orig = image_vis.shape[:2]
         gt_mask_vis = test_dataset_vis[n][1].astype('uint8')
         image, gt_mask = test_dataset[n]
         gt_mask_vis = gt_mask_vis[:, :, :1].squeeze()
     elif dataset_mode == 'from_folder':
         images_list = os.listdir(images_folder)
-        n = np.random.choice(len(images_list))
-        image_vis = cv2.imread(os.path.join(images_folder, images_list[n]))
+        if i >= len(images_folder):
+            break
+        n = i  # np.random.choice(len(images_list))
+        image_path = os.path.join(images_folder, images_list[n])
+        if os.path.isdir(image_path):
+            continue
+        image_vis = cv2.imread(image_path)
         shape_orig = image_vis.shape[:2]
         # Apply the same steps on the image as for an image from the dataset
         image_vis = cv2.cvtColor(image_vis, cv2.COLOR_BGR2RGB)
@@ -171,8 +181,8 @@ for i in range(20):
         gt_mask_vis[inds[0], inds[1], :] = train_dataset.class_values[i]
     gt_mask_vis[untagged_indices[0], untagged_indices[1], :] = 0
 
-    # cv2.imwrite(os.path.join(save_dir, os.path.split(image_path)[1]).replace('.JPG', '.tif'),
-    #             cv2.cvtColor(pr_mask_vis, cv2.COLOR_RGB2BGR))
+    cv2.imwrite(os.path.join(save_dir, os.path.split(image_path)[1]).replace('.JPG', '.tif'),
+                cv2.cvtColor(pr_mask_vis, cv2.COLOR_RGB2BGR))
 
     visualize(
         image=image_vis,
