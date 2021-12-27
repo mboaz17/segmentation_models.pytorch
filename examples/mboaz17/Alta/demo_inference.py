@@ -29,8 +29,8 @@ x_train_dir = os.path.join(images_dir, dataset_name)
 y_train_dir = os.path.join(annotations_dir, dataset_name)
 x_valid_dir = os.path.join(images_dir, dataset_name)
 y_valid_dir = os.path.join(annotations_dir, dataset_name)
-x_test_dir = os.path.join('/media/isl12/Alta/V7_Exp_25_1_21/Agamim/Descend/100_0006')
-y_test_dir = os.path.join('/media/isl12/Alta/V7_Exp_25_1_21_annot/Agamim/Descend/100_0006')
+x_test_dir = os.path.join('/media/isl12/Alta/V7_Exp_25_1_21/Agamim/Descend/100_0005')
+y_test_dir = os.path.join('/media/isl12/Alta/V7_Exp_25_1_21_annot/Agamim/Descend/100_0005')
 
 # %%
 # helper function for data visualization
