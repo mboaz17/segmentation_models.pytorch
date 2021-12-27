@@ -1,8 +1,8 @@
 import albumentations as albu
 import cv2
 
-M = 1280  # 2560
-N = 1280  # 2560
+M = 1216  # 1280  # 2560
+N = 1216  # 1280  # 2560
 
 def get_training_augmentation():
     train_transform = [

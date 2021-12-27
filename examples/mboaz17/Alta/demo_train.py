@@ -1,4 +1,6 @@
 import os
+import shutil
+from datetime import datetime
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
@@ -11,6 +13,7 @@ import matplotlib.pyplot as plt
 # annotations_dir = '/media/isl12/Alta/V7_Exp_25_1_21_annot'
 # dataset_name = 'Agamim/Path/A/30'
 
+sampling_interval=[3,3]
 images_dir = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Alta/train'
 annotations_dir = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Alta/trainannot'
 dataset_name = ''
@@ -44,7 +47,7 @@ from datasets import Dataset
 
 # %%
 # Lets look at data we have
-dataset = Dataset(x_train_dir, y_train_dir, classes=['vegetation'])
+# dataset = Dataset(x_train_dir, y_train_dir, classes=['vegetation'])
 # image, mask = dataset[4]  # get some sample
 # visualize(
 #     image=image,
@@ -105,6 +108,7 @@ train_dataset = Dataset(
     augmentation=get_training_augmentation(),
     preprocessing=get_preprocessing(preprocessing_fn),
     classes=CLASSES,
+    sampling_interval=sampling_interval,
 )
 
 valid_dataset = Dataset(
@@ -113,6 +117,7 @@ valid_dataset = Dataset(
     augmentation=get_validation_augmentation(),
     preprocessing=get_preprocessing(preprocessing_fn),
     classes=CLASSES,
+    sampling_interval=sampling_interval,
 )
 
 train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=0)
@@ -158,28 +163,56 @@ valid_epoch = smp.utils.train.ValidEpoch(
 )
 
 # %%
+# Opening a file
+log_filename = './log.txt'
+logfile = open(log_filename, 'w')
 
-# train model for 40 epochs
-
+# train model
 max_score = 0
-iter_num = 40
+iter_num = 30
 for i in range(0, iter_num):
+    s = '\nEpoch: {}'.format(i)
+    print(s)
+    logfile.write(s + '\n')
 
-    print('\nEpoch: {}'.format(i))
     train_logs = train_epoch.run(train_loader)
-    # valid_logs = valid_epoch.run(valid_loader)
+    logfile.writelines([k + ': ' + str(v) + '\n' for k,v in train_logs.items()])
+    valid_logs = valid_epoch.run(valid_loader)
 
     # do something (save model, change lr, etc.)
-    if 1:  # max_score < valid_logs['iou_score']:
-        # max_score = valid_logs['iou_score']
+    s = 'valid_score = {}'.format(valid_logs['iou_score'])
+    print(s)
+    logfile.write(s + '\n')
+    torch.save(model, './latest_model.pth')
+    s = 'Latest model (iter={}) saved!'.format(i)
+    print(s)
+    logfile.write(s + '\n')
+
+    if max_score < valid_logs['iou_score']:
+        max_score = valid_logs['iou_score']
         torch.save(model, './best_model.pth')
-        print('Model saved!')
+        s = 'Best model (iter={}) saved!'.format(i)
+        print(s)
+        logfile.write(s + '\n')
 
-    if i == 25:
-        optimizer.param_groups[0]['lr'] = 1e-5
-        print('Decrease decoder learning rate to 1e-5!')
+    # if i == 25:
+    #     optimizer.param_groups[0]['lr'] = 1e-5
+    #     print('Decrease decoder learning rate to 1e-5!')
 
-## Test best saved model
+logfile.close()
+
+# Copy model and scripts to reults folder
+now = datetime.now()
+dt_string = now.strftime("%d_%m_%Y_%H:%M:%S")
+new_dir = './training_' + dt_string
+os.mkdir(new_dir)
+
+shutil.copy('./best_model.pth', new_dir)
+shutil.copy('./latest_model.pth', new_dir)
+shutil.copy('./demo_train.py', new_dir)
+shutil.copy('./datasets.py', new_dir)
+shutil.copy('./augmentations.py', new_dir)
+shutil.copy('./log.txt', new_dir)
 
 # load best saved checkpoint
 best_model = torch.load('./best_model.pth')
@@ -193,6 +226,7 @@ test_dataset = Dataset(
     augmentation=get_validation_augmentation(),
     preprocessing=get_preprocessing(preprocessing_fn),
     classes=CLASSES,
+    sampling_interval=sampling_interval,
 )
 
 test_dataloader = DataLoader(test_dataset)
@@ -214,11 +248,12 @@ test_epoch = smp.utils.train.ValidEpoch(
 test_dataset_vis = Dataset(
     x_test_dir, y_test_dir,
     classes=CLASSES,
+    sampling_interval=sampling_interval,
 )
 
 # %%
 
-for i in range(5):
+for i in range(0):
     n = i  # np.random.choice(len(test_dataset))
 
     image_vis = test_dataset_vis[n][0].astype('uint8')

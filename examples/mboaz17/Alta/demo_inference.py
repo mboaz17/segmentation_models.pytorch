@@ -20,6 +20,7 @@ import segmentation_models_pytorch as smp
 # annotations_dir = '/media/isl12/Alta/V7_Exp_25_1_21_annot'
 # dataset_name = 'Agamim/Path/A/30'
 
+sampling_interval=[3,3]
 images_dir = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Alta/train'
 annotations_dir = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Alta/trainannot'
 dataset_name = ''
@@ -28,8 +29,8 @@ x_train_dir = os.path.join(images_dir, dataset_name)
 y_train_dir = os.path.join(annotations_dir, dataset_name)
 x_valid_dir = os.path.join(images_dir, dataset_name)
 y_valid_dir = os.path.join(annotations_dir, dataset_name)
-x_test_dir = os.path.join(images_dir, dataset_name)
-y_test_dir = os.path.join(annotations_dir, dataset_name)
+x_test_dir = os.path.join('/media/isl12/Alta/V7_Exp_25_1_21/Agamim/Descend/100_0006')
+y_test_dir = os.path.join('/media/isl12/Alta/V7_Exp_25_1_21_annot/Agamim/Descend/100_0006')
 
 # %%
 # helper function for data visualization
@@ -66,6 +67,7 @@ train_dataset = Dataset(
     augmentation=get_training_augmentation(),
     preprocessing=get_preprocessing(preprocessing_fn),
     classes=CLASSES,
+    sampling_interval=sampling_interval,
 )
 
 valid_dataset = Dataset(
@@ -74,6 +76,7 @@ valid_dataset = Dataset(
     augmentation=get_validation_augmentation(),
     preprocessing=get_preprocessing(preprocessing_fn),
     classes=CLASSES,
+    sampling_interval=sampling_interval,
 )
 
 # load best saved checkpoint
@@ -88,6 +91,7 @@ test_dataset = Dataset(
     augmentation=get_validation_augmentation(),
     preprocessing=get_preprocessing(preprocessing_fn),
     classes=CLASSES,
+    sampling_interval=sampling_interval,
 )
 
 test_dataloader = DataLoader(test_dataset)
@@ -99,11 +103,16 @@ test_dataloader = DataLoader(test_dataset)
 test_dataset_vis = Dataset(
     x_test_dir, y_test_dir,
     classes=CLASSES,
+    sampling_interval=sampling_interval,
 )
 
 # %%
 
-for i in range(10):
+save_dir = os.path.join(x_test_dir, 'results')
+if not os.path.isdir(save_dir):
+    os.mkdir(save_dir)
+
+for i in range(0, 125, 10):
     n = i  # np.random.choice(len(test_dataset))
 
     image_vis = test_dataset_vis[n][0].astype('uint8')
@@ -127,6 +136,9 @@ for i in range(10):
 
     iou = (pr_mask_vis == gt_mask_vis).all(axis=2).mean()
     print('IOU = {}'.format(iou))
+
+    cv2.imwrite(os.path.join(save_dir, os.path.split(test_dataset_vis.masks_fps[n])[1]),
+                cv2.cvtColor(pr_mask_vis, cv2.COLOR_RGB2BGR))
     visualize(
         image=image_vis,
         ground_truth_mask=gt_mask_vis,
