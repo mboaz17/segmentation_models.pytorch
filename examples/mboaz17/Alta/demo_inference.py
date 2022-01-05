@@ -20,17 +20,17 @@ import segmentation_models_pytorch as smp
 # annotations_dir = '/media/isl12/Alta/V7_Exp_25_1_21_annot'
 # dataset_name = 'Agamim/Path/A/30'
 
-sampling_interval=[3,3]
-images_dir = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Alta/train'
-annotations_dir = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Alta/trainannot'
+sampling_interval=[4,4]
+images_dir = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Alta/AgamimPathB/train'
+annotations_dir = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Alta/AgamimPathB/trainannot'
 dataset_name = ''
 
 x_train_dir = os.path.join(images_dir, dataset_name)
 y_train_dir = os.path.join(annotations_dir, dataset_name)
 x_valid_dir = os.path.join(images_dir, dataset_name)
 y_valid_dir = os.path.join(annotations_dir, dataset_name)
-x_test_dir = os.path.join('/media/isl12/Alta/V7_Exp_25_1_21/Agamim/Descend/100_0005')
-y_test_dir = os.path.join('/media/isl12/Alta/V7_Exp_25_1_21_annot/Agamim/Descend/100_0005')
+x_test_dir = os.path.join('/media/isl12/Alta/V7_Exp_25_1_21/Agamim/Descend/100_0006')
+y_test_dir = os.path.join('/media/isl12/Alta/V7_Exp_25_1_21_annot/Agamim/Descend/100_0006')
 
 # %%
 # helper function for data visualization
@@ -117,6 +117,11 @@ for i in range(0, 125, 10):
 
     image_vis = test_dataset_vis[n][0].astype('uint8')
     image, gt_mask = test_dataset[n]
+    shape_img = image_vis.shape
+    shape_expanded = gt_mask.shape[1:]
+    h_pad = int((shape_expanded[0] - shape_img[0])/2)
+    v_pad = int((shape_expanded[1] - shape_img[1])/2)
+    gt_mask = gt_mask[:, h_pad:shape_expanded[0]-h_pad, v_pad:shape_expanded[1]-v_pad]
 
     gt_mask_pos = gt_mask.sum(axis=0)
     gt_mask = gt_mask.argmax(axis=0)
@@ -126,8 +131,12 @@ for i in range(0, 125, 10):
     pr_score = (pr_mask.squeeze().cpu().numpy()).max(axis=0)
     pr_mask = (pr_mask.squeeze(dim=0).cpu().numpy().round())
     pr_mask = pr_mask.argmax(axis=0)
+    pr_mask = pr_mask[h_pad:shape_expanded[0]-h_pad, v_pad:shape_expanded[1]-v_pad]
+    pr_score = pr_score[h_pad:shape_expanded[0]-h_pad, v_pad:shape_expanded[1]-v_pad]
+
     pr_mask_vis = 0*image_vis
     gt_mask_vis = 0*image_vis
+
     for i in range(len(train_dataset.class_values)):
         inds = (pr_mask == i).nonzero()
         pr_mask_vis[inds[0], inds[1], :] = train_dataset.class_values[i]

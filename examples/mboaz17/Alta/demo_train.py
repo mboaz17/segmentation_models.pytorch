@@ -13,9 +13,9 @@ import matplotlib.pyplot as plt
 # annotations_dir = '/media/isl12/Alta/V7_Exp_25_1_21_annot'
 # dataset_name = 'Agamim/Path/A/30'
 
-sampling_interval=[3,3]
-images_dir = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Alta/train'
-annotations_dir = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Alta/trainannot'
+sampling_interval=[4,4]
+images_dir = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Alta/AgamimPathB/train'
+annotations_dir = '/home/airsim/repos/segmentation_models.pytorch/examples/data/Alta/AgamimPathB/trainannot'
 dataset_name = ''
 
 x_train_dir = os.path.join(images_dir, dataset_name)
@@ -169,7 +169,7 @@ logfile = open(log_filename, 'w')
 
 # train model
 max_score = 0
-iter_num = 30
+iter_num = 20
 for i in range(0, iter_num):
     s = '\nEpoch: {}'.format(i)
     print(s)

@@ -49,7 +49,7 @@ class Dataset(BaseDataset):
         }
         class_mapping_curr2orig = { 0:[0], 1:[1], 2:[2], 3:[3], 4:[4], 5:[5], 6:[6,7,8,9,10,11,12,13,14] }
         # class_intervals = [5, 10, 10, 1, 10, 10, 10]
-        class_intervals = [10, 10, 5, 1, 5, 5, 5]
+        class_intervals = [5, 5, 5, 1, 5, 5, 5]
     else:
         CLASSES = CLASSES_ORIG
         class_mapping_curr2orig = {cls:[cls] for cls in range(len(CLASSES))}
